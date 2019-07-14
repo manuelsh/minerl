@@ -89,7 +89,6 @@ class Agent():
         """
         states, actions, rewards, next_states, dones = experiences
         self.qnetwork_local.train()
-        import pdb;pdb.set_trace()
         actions_local = torch.gather(self.qnetwork_local(states['visual'], states['not_visual']), 1, actions)
         best_action_local = self.qnetwork_local(next_states['visual'], next_states['not_visual']).max(dim=1)[1]
         actions_target = rewards + gamma * torch.gather( self.qnetwork_target(next_states['visual'], next_states['not_visual']),

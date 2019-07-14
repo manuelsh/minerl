@@ -48,7 +48,8 @@ class QNetworkVisual(nn.Module):
         self.conv_2 = nn.Conv2d(32,64, kernel_size=4, stride=2)
         self.conv_3 = nn.Conv2d(64,64, kernel_size=3, stride=1)
         self.linear_1 = nn.Linear(1024+non_visual_state_dim, 512)
-        self.linear_2 = nn.Linear(512, action_size)
+        self.linear_2 = nn.Linear(512, 512) # added in v2
+        self.linear_3 = nn.Linear(512, action_size)
 
     def forward(self, visual_state, non_visual_state):
         """Build a network that maps state -> action values."""
@@ -62,4 +63,6 @@ class QNetworkVisual(nn.Module):
         r = self.linear_1(torch.cat([ r.view(r.shape[0], -1),  non_visual_state.view(-1,1) ], dim=1 ) )
         r = F.relu(r)
         r = self.linear_2(r)
+        r = F.relu(r)
+        r = self.linear_3(r)
         return r
