@@ -117,8 +117,9 @@ class Monitor:
     def _add(
         self, 
         name: str,
-        data: any
+        data: Union[float, int]
     ):
+        assert not isinstance(data, torch.Tensor), 'Monitor failing: Input data is a tensor'
         if name in self.data:
             if isinstance(data, List):
                 self.data[name].append(*data)

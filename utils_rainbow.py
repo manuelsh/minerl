@@ -1,5 +1,10 @@
-import numpy as np
+import random
+from collections import  OrderedDict, deque
 from typing import Deque, Dict, List, Tuple
+
+import numpy as np
+import torch
+from segment_tree import MinSegmentTree, SumSegmentTree
 
 class ReplayBuffer:
     """A simple numpy replay buffer."""
@@ -223,3 +228,50 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         weight = weight / max_weight
         
         return weight
+    
+
+class AdaptorRainbow():
+    def __init__(self, obs_rest, actions_dict, always_keys):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.obs_rest = obs_rest # If there is more than POV
+        self.actions_items = list(actions_dict.items())
+        self.always_keys = always_keys
+       
+    def float_tensor(self, numpy_array):
+        return torch.FloatTensor(numpy_array).to(self.device)
+    
+    def unflatten_obs(self, flat_obs):
+        if self.obs_rest:
+            return (flat_obs[:,:-1].reshape(-1,64,64,3), flat_obs[:,-1].reshape(-1,1))
+        else:
+            return flat_obs.reshape(-1,64,64,3)
+        
+    def flatten_obs(self, obs):
+        if self.obs_rest:
+            return np.append(obs['pov'].reshape(-1), obs['compassAngle'])
+        else:
+            return obs['pov'].reshape(-1)
+    
+    def env2model(self, env_obs):
+        return self.float_tensor( [env_obs['pov'].astype(float)])
+        
+    def model_act2env_act(self, action_number):
+        env_act = self.always_keys.copy()
+        env_act.update(self.actions_items[action_number][1])
+        return env_act
+    
+    def buffer2train(self, transitions):
+        if self.obs_rest:
+            pass
+#         state_visual, state_not_visual = self.unflatten_state( samples["obs"] )
+#         next_state_visual, next_state_not_visual = self.unflatten_state( samples["next_obs"] )
+        # next_state_not_visual = self.float_tensor( next_state_not_visual )
+        else:
+            obss = self.unflatten_obs( self.float_tensor(transitions['obs']) )
+            next_obss = self.unflatten_obs( self.float_tensor(transitions['next_obs']) )
+            acts = torch.LongTensor(transitions['acts']).to(self.device)
+            rews = self.float_tensor(transitions['rews'].reshape(-1, 1))
+            dones = self.float_tensor(transitions['done'].reshape(-1, 1))
+            next_obss_rest = obss_rest = None
+        return obss, obss_rest, next_obss, next_obss_rest, acts, rews, dones
+    

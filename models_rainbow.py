@@ -1,6 +1,10 @@
-import torch.nn as nn
-import torch
 import math
+import numpy as np
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 
 class NoisyLinear(nn.Module):
     """Noisy linear module for NoisyNet.
@@ -20,7 +24,7 @@ class NoisyLinear(nn.Module):
         self, 
         in_features: int, 
         out_features: int, 
-        std_init: float = 0.5,
+        std_init: float,
     ):
         """Initialization."""
         super(NoisyLinear, self).__init__()
@@ -91,10 +95,13 @@ class Network(nn.Module):
         out_dim: int, 
         atom_size: int,
         non_visual_state_dim: int,
-        support: torch.Tensor
+        support: torch.Tensor,
+        std_noisy: float
     ):
         """Initialization."""
         super(Network, self).__init__()
+        
+        self.obs_rest = (non_visual_state_dim>0)
         
         self.support = support
         self.out_dim = out_dim
@@ -121,12 +128,12 @@ class Network(nn.Module):
 
         
         # set advantage layer
-        self.advantage_hidden_layer = NoisyLinear(128, 128)
-        self.advantage_layer = NoisyLinear(128, out_dim * atom_size)
+        self.advantage_hidden_layer = NoisyLinear(128, 128, std_noisy)
+        self.advantage_layer = NoisyLinear(128, out_dim * atom_size, std_noisy)
 
         # set value layer
-        self.value_hidden_layer = NoisyLinear(128, 128)
-        self.value_layer = NoisyLinear(128, atom_size)
+        self.value_hidden_layer = NoisyLinear(128, 128, std_noisy)
+        self.value_layer = NoisyLinear(128, atom_size, std_noisy)
 
     def forward(self, x_visual: torch.Tensor, x_not_visual: torch.Tensor) -> torch.Tensor:
         """Forward method implementation."""
@@ -138,7 +145,10 @@ class Network(nn.Module):
     def dist(self,  x_visual: torch.Tensor, x_not_visual: torch.Tensor) -> torch.Tensor:
         """Get distribution for atoms."""
         r = self.feature_layer_1(x_visual.permute(0,3,1,2))
-        feature = self.feature_layer_2(torch.cat([ r.view(r.shape[0], -1),  x_not_visual.view(-1,1) ], dim=1 ))
+        if self.obs_rest:
+            feature = self.feature_layer_2(torch.cat([ r.view(r.shape[0], -1),  x_not_visual.view(-1,1) ], dim=1 ))
+        else:
+            feature = self.feature_layer_2(r.view(r.shape[0], -1))
         adv_hid = F.relu(self.advantage_hidden_layer(feature))
         val_hid = F.relu(self.value_hidden_layer(feature))
         
